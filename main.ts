@@ -21,11 +21,17 @@
 // light-day from Earth; Nvidia halts H-series chip shipments to China;
 // Pew: Islam set to be the world's largest religion by 2035.
 
-import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+// Contract: this entry copies the PNG this repository ships to
+// <output>/entry.png — no network, no randomness, no clock — so two runs
+// write byte-identical files. The output directory comes from
+// MAKEFUN_OUTPUT_DIR when set; otherwise the grader's /output mount when
+// it exists; otherwise a plain `output` directory for local runs.
+const outDir = process.env.MAKEFUN_OUTPUT_DIR
+  ?? (existsSync('/output') ? '/output' : 'output');
 const here = dirname(fileURLToPath(import.meta.url));
 const src = join(here, 'entry.png');
 const dst = join(outDir, 'entry.png');
@@ -40,3 +46,9 @@ if (bytes.length > 1048576) throw new Error(`entry.png is ${bytes.length} bytes,
 
 mkdirSync(outDir, { recursive: true });
 copyFileSync(src, dst);
+
+// Determinism guard: read the written file back and require it to be
+// byte-identical to the shipped image, so a partial or corrupted copy
+// fails loudly instead of reaching the judge.
+const written = readFileSync(dst);
+if (!written.equals(bytes)) throw new Error('entry.png copy failed byte-equality check');
